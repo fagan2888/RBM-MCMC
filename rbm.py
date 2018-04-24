@@ -154,7 +154,7 @@ class localRBM(RBM):
             assert (visible[i]-window[i])%stride[i] == 0
         self.window = window
         self.stride = stride
-        self.hidden = [int((visible[i]-window[i])/stride[i]) for i in range(self.dimension)]
+        self.hidden = [int((visible[i]-window[i])/stride[i]+1) for i in range(self.dimension)]
         super().__init__(visible, self.hidden)
         self.maskmatrix = self.getmask()
         self.weights = self.mask(self.weights)
