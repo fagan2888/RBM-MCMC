@@ -92,7 +92,7 @@ class RBM():
     
     __str__ = __repr__
     
-    def probabilityonvisible(self,visibledatas):
+    def probabilityonvisible(self, visibledatas):
         '''
         Get the conditional activation probability of hidden layer based on given configuration of visible layer.
         
@@ -100,10 +100,10 @@ class RBM():
         :returns: array of probability 1d arrays with the number of elements the same as hidden neurons 
         '''
         biasb = np.array([self.biasonhidden for _ in range(len(visibledatas))])
-        visibledatas = visibledatas.reshape(visibledatas.shape[0],self.novisible)
+        visibledatas = visibledatas.reshape(visibledatas.shape[0], self.novisible)
         return expit(visibledatas@self.weights.T+biasb)
     
-    def probabilityonhidden(self,hiddendatas):
+    def probabilityonhidden(self, hiddendatas):
         '''
         Get the conditional activation probability of visible layer based on given configuration of hidden layer.
         
@@ -111,10 +111,10 @@ class RBM():
         :returns: array of probability 1d arrays with the number of elements the same as visible neurons 
         '''
         biasb = np.array([self.biasonvisible for _ in range(len(hiddendatas))])
-        hiddendatas = hiddendatas.reshape(hiddendatas.shape[0],self.nohidden)
+        hiddendatas = hiddendatas.reshape(hiddendatas.shape[0], self.nohidden)
         return expit(hiddendatas@self.weights+biasb)
     
-    def sampleonvisible(self,visibledatas):
+    def sampleonvisible(self, visibledatas):
         '''
         Get one sample configuration of hidden layer based on given configuration of visible layer.
         
@@ -124,7 +124,7 @@ class RBM():
         probability = self.probabilityonvisible(visibledatas)
         return sampleinput(probability)
 
-    def sampleonhidden(self,hiddendatas):
+    def sampleonhidden(self, hiddendatas):
         '''
         Get one sample configuration of visible layer based on given configuration of vhidden layer.
         
@@ -134,7 +134,7 @@ class RBM():
         probability = self.probabilityonhidden(hiddendatas)
         return sampleinput(probability)
     
-    def energy(self,visibledata,hiddendata):
+    def energy(self, visibledata, hiddendata):
         '''
         Calculate the energy of the model given configuration of both layers.
         
@@ -180,12 +180,12 @@ class RBM():
 
         Note one step is v->h->v, so the hidden layer configurations is half step before visble ones.
         '''
-        for i in range(nosteps):
+        for _ in range(nosteps):
             hiddendatas = self.sampleonvisible(visibledatas)
             visibledatas = self.sampleonhidden(hiddendatas)
-        return [visibledatas,hiddendatas]
+        return [visibledatas, hiddendatas]
     
-    def cdk(self, visibledatas, nosteps = 1):
+    def cdk(self, visibledatas, nosteps=1):
         '''
         Modified Gibbs update used for CD-k training.
         
@@ -198,13 +198,13 @@ class RBM():
         by probability intead of states and then we use the probability to calculate probability of hidden 
         layer as data for hidden layer which is half step later compared to visibledata.
         '''
-        if nosteps>1:
+        if nosteps > 1:
             hiddendatas = self.Gibbsupdate(visibledatas, nosteps-1)[1]
         elif nosteps == 1:
             hiddendatas = self.sampleonvisible(visibledatas)
         visibledatas = self.probabilityonhidden(hiddendatas)
         hiddendatas = self.probabilityonvisible(visibledatas)
-        return [visibledatas,hiddendatas]
+        return [visibledatas, hiddendatas]
     
     def fit(self, visibledatas, testdatas, batch = 20, epoch = 50, learningrate = 0.05,
             regulation1 = 0, regulation2 = 0, cdkstep = 1, debuglog = True):
@@ -235,14 +235,14 @@ class RBM():
                 visibled = visibled.reshape(length, self.novisible)      
                 hiddend = self.probabilityonvisible(visibled)
                 
-                positivev = np.mean(visibled,axis=0)
-                positiveh = np.mean(hiddend,axis=0)
+                positivev = np.mean(visibled, axis=0)
+                positiveh = np.mean(hiddend, axis=0)
                 positivew = np.transpose(hiddend)@visibled
                 
-                [visiblem, hiddenm] = self.cdk(visibled,nosteps=cdkstep)
+                [visiblem, hiddenm] = self.cdk(visibled, nosteps=cdkstep)
                 negativew = np.transpose(hiddenm)@visiblem
-                negativev = np.mean(visiblem,axis=0)
-                negativeh = np.mean(hiddenm,axis=0)
+                negativev = np.mean(visiblem, axis=0)
+                negativeh = np.mean(hiddenm, axis=0)
 
                 self.weights += self.mask((learningrate/length)*(positivew-negativew))
                 if regulation1 != 0:
@@ -254,7 +254,7 @@ class RBM():
                 self.biasonhidden += learningrate*(positiveh-negativeh)
 
             noepoch += 1
-            if debuglog == True:
+            if debuglog is True:
                 print('-------------------')
                 print('epoch: %s finished'%noepoch)
                 print('the reconstruction error: %s'%self.error(testdatas))
@@ -315,7 +315,7 @@ class localRBM(RBM):
             for windowpos in np.ndindex(*self.window):
                 visiblepos = tuple(np.multiply(np.array(hiddenpos),np.array(self.stride))+np.array(windowpos))
                 maskm[hiddenpos+visiblepos] = 1
-        return maskm.reshape(self.nohidden,self.novisible)
+        return maskm.reshape(self.nohidden, self.novisible)
         
     def mask(self, updateweights):
-        return np.multiply(self.maskmatrix, updateweights) 
+        return np.multiply(self.maskmatrix, updateweights)
