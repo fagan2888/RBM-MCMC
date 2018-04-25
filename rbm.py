@@ -13,6 +13,7 @@ def chunks(l, n):
     :param l: the list to be divided
     :param n: the integer for the number of elements in one batch
     :yields: list of batch size
+    
     Note the last batch may be smaller if 1%n != 0.
     '''
     np.random.shuffle(l)
@@ -50,6 +51,7 @@ class RBM():
     
     :param visible: a list with the visble layer size, eg. [28,28] for MNIST data
     :param hidden: a list with the hidden layer size
+
     Some trainning details are inspired by : https://www.cs.toronto.edu/~hinton/absps/guideTR.pdf
     '''
     
@@ -176,6 +178,7 @@ class RBM():
         :param nosteps: integer for the Gibbs update steps
         :returns: list of two arrays, the first is configuration of visible layer 
                   and the second is for hidden layer
+
         Note one step is v->h->v, so the hidden layer configurations is half step before visble ones
         '''
         for i in range(nosteps):
@@ -191,6 +194,7 @@ class RBM():
         :param nosteps: integer for the Gibbs update steps or the k in CD-k
         :returns: list of two arrays, the first is configuration of visible layer 
                   and the second is for hidden layer
+
         Note the difference between cdk update and Gibbs update. In the last step, the visible data are given 
         by probability intead of states and then we use the probability to calculate probability of hidden 
         layer as data for hidden layer which is half step later compared to visibledata.
