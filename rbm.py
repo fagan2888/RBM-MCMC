@@ -1,5 +1,5 @@
 '''
-Basic modules for Restricted Boltzmann machine(RBM) and its generalizations.
+The basic module for Restricted Boltzmann machine(RBM) and its generalizations.
 '''
 
 import numpy as np
@@ -48,16 +48,12 @@ class RBM():
     '''
     RBM class
     
+    :param visible: a list with the visble layer size, eg. [28,28] for MNIST data
+    :param hidden: a list with the hidden layer size
     Some trainning details are inspired by : https://www.cs.toronto.edu/~hinton/absps/guideTR.pdf
     '''
     
     def __init__(self, visible, hidden):
-        '''
-        Initial the RBM instance with the structure of visible and hidden layers are given.
-        
-        :param visible: a list with the visble layer size, eg. [28,28] for MNIST data
-        :param hidden: a list with the hidden layer size
-        '''
         self.novisible = np.prod(visible)
         self.visible = visible
         self.nohidden = np.prod(hidden)
@@ -99,7 +95,7 @@ class RBM():
         '''
         Get the conditional activation probability of hidden layer based on given configuration of visible layer.
         
-        :visibledatas: array of visible configuration arrays (both in 1d or in the shape of visible layers are ok)
+        :param visibledatas: array of visible configuration arrays (both in 1d or in the shape of visible layers are ok)
         :returns: array of probability 1d arrays with the number of elements the same as hidden neurons 
         '''
         biasb = np.array([self.biasonhidden for _ in range(len(visibledatas))])
@@ -110,7 +106,7 @@ class RBM():
         '''
         Get the conditional activation probability of visible layer based on given configuration of hidden layer.
         
-        :hiddendatas: array of hidden configuration arrays (both in 1d or in the shape of hidden layers are ok)
+        :param hiddendatas: array of hidden configuration arrays (both in 1d or in the shape of hidden layers are ok)
         :returns: array of probability 1d arrays with the number of elements the same as visible neurons 
         '''
         biasb = np.array([self.biasonvisible for _ in range(len(hiddendatas))])
@@ -121,7 +117,7 @@ class RBM():
         '''
         Get one sample configuration of hidden layer based on given configuration of visible layer.
         
-        :visibledatas: array of visible configuration arrays (both in 1d or in the shape of visible layers are ok)
+        :param visibledatas: array of visible configuration arrays (both in 1d or in the shape of visible layers are ok)
         :returns: array of 1d configuration arrays with the number of elements the same as hidden neurons 
         '''
         probability = self.probabilityonvisible(visibledatas)
@@ -131,7 +127,7 @@ class RBM():
         '''
         Get one sample configuration of visible layer based on given configuration of vhidden layer.
         
-        :visibledatas: array of hidden configuration arrays (both in 1d or in the shape of hidden layers are ok)
+        :param visibledatas: array of hidden configuration arrays (both in 1d or in the shape of hidden layers are ok)
         :returns: array of 1d configuration arrays with the number of elements the same as visible neurons 
         '''
         probability = self.probabilityonhidden(hiddendatas)
@@ -219,8 +215,8 @@ class RBM():
         :param learningrate: real value for the update rate
         :param regulation1: L1 regularization term
         :param regulation2: L2 regularization term
-        :cdkstep: integer value of k in CD-k training
-        :debuglog: boolean, true for information print after each epoch
+        :param cdkstep: integer value of k in CD-k training
+        :param debuglog: boolean, true for information print after each epoch
         '''
         noepoch = 0
         notestdatas = len(testdatas)
@@ -288,16 +284,13 @@ class RBM():
 class localRBM(RBM):
     '''
     RBM with locality, where only the weights within windows are nonzero for each hidden layer neuron.
+    
+    :param visible: a list with the visble layer size, eg. [28,28] for MNIST data
+    :param window: a list for the size of window, eg. [2,2]
+    :param stride: a list for the size of stride, eg. [2,2]
     '''
     
     def __init__(self, visible, window, stride):
-        '''
-        Initialize localRBM instance with the size of window and the size of stride (the same concepts in CNN).
-        
-        :param visible: a list with the visble layer size, eg. [28,28] for MNIST data
-        :param window: a list for the size of window, eg. [2,2]
-        :param stride: a list for the size of stride, eg. [2,2]
-        '''
         self.dimension = len(visible)
         for i in range(self.dimension):
             assert (visible[i]-window[i])%stride[i] == 0

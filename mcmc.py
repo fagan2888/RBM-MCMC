@@ -27,20 +27,17 @@ class hamiltonian():
     the best practice is to inherit this class to customize Hamiltonian.
     The hamiltonian class now is only suitable for lattice model with Ising type two spin interactions,
     apart from the external field term where only one spin is involved.
+        
+    :param sizelist: a list whose elements give the size information of the system, 
+                         eg. [3,4,5] describes the system with size 3*4*5 in three dimension
+    :param maxsep: an integer signals the furthest coupling distance, 
+                       eg. 1 is usually for only NN coupling is considered
+    :param coupling: a list gives the coupling strength for different coupling terms in the Hamiltonian
+    :raise: assert len(coupling) == maxsep+2, the two extra terms of couplings are for external field 
+                and square of the single spin
     '''
     
     def __init__(self,sizelist,maxsep=1,coupling=[0,0,-1]):
-        '''
-        Set the system size and groups of different couplings.
-        
-        :param sizelist: a list whose elements give the size information of the system, 
-                         eg. [3,4,5] describes the system with size 3*4*5 in three dimension
-        :param maxsep: an integer signals the furthest coupling distance, 
-                       eg. 1 is usually for only NN coupling is considered
-        :param coupling: a list gives the coupling strength for different coupling terms in the Hamiltonian
-        :raise: assert len(coupling) == maxsep+2, the two extra terms of couplings are for external field 
-                and square of the single spin
-        '''
         self.sizelist = sizelist
         self.dimension = len(sizelist)
         self.maxsep = maxsep
@@ -104,7 +101,7 @@ class Ising(hamiltonian):
     Subclass from hamitonian. It defines Ising model on any dimension on cube lattice where 
     only NN coupling is implemented. One can inherit Ising class by implementing further neighbor 
     terms in neighbor() to simply generalize Ising model to more coupling terms.
-    Terms of $h_i S_i$ or $j_i S_i^2$ are kept from the parent class,
+    Terms of :math:`coupling_0 S_i` or :math:`coupling_1 S_i^2` are kept from the parent class,
     which correspond to the first two coupling strength.
     '''
     
@@ -141,7 +138,8 @@ class Ising(hamiltonian):
         '''
         The fast reimplementation of totalenergy, one may also overwrites the original function with the same name.
         
-        :params spin: the array with the system size shape whose elements give spin states
+        :param spin: the array with the system size shape whose elements give spin states
+        :returns: the real value of the total energy in the system
         '''
         te = 0
         for i in range(spin.shape[0]-1):
@@ -159,14 +157,11 @@ class Ising(hamiltonian):
 class configuration():
     '''
     The class who store the configuration of the system and carryies out Monte Carlo updates.
+
+    :param hamiltonianobj: one instance from hamiltonian class or its subclasses
     '''
        
     def __init__(self,hamiltonianobj):
-        '''
-        Initialize the class with some basic information from the hamiltonian.
-        
-        :param hamiltonianobj: one instance from hamiltonian class or its subclasses
-        '''
         self.system = hamiltonianobj
         self.config = np.ones(self.system.sizelist,dtype=np.int64)
         self.sites = np.product(self.system.sizelist)
@@ -176,7 +171,7 @@ class configuration():
         '''
         Refresh the configurations of the system from an specified configuration
         
-        :params outconfig: the configuration array with system size shape
+        :param outconfig: the configuration array with system size shape
         '''
         self.config = outconfig[:]
         self.measurement([],2)
@@ -188,7 +183,7 @@ class configuration():
         
         :param positions: the list whose elements are lists for lattice positions whose spin states 
                           have been updated in this step of MC updates
-        :params updated: integers can be taken as 0 to 3.
+        :param updated: integers can be taken as 0 to 3.
                          0 is for an initialize;
                          1 is for no update on configurations
                          2 is for local update where the calculation should base on positions
@@ -211,13 +206,13 @@ class configuration():
         ''' 
         This is the main module to execute the Monte Carlo moves 
         
-        :param beta: a positive real value for the inverse of temperature, $\frac{1}{k_B T}$
+        :param beta: a positive real value for the inverse of temperature, :math:`\\frac{1}{k_B T}`
         :param autotime: an integer for MC steps to conduct
         :param method: some string indicates the update method. 'local_update' is the default one.
                        Other methods implemented in this class include 'wolff_update', which is only
                        suitable for typical Ising model with only NN coupling terms and 'rbm_update'
                        whose update proposal is generated by Gibbs updates of RBM machine.
-        :params tool: a list which may contains extra information that is needed for certain update scheme,
+        :param tool: a list which may contains extra information that is needed for certain update scheme,
                       In 'rbm_update' case, the tool list contains three terms. The RBM machine object, 
                       the number of steps for Gibbs update for each MC update and a boolen for binary states.
         
@@ -282,8 +277,8 @@ class configuration():
         :param beta: the real value for inverse temperature
         :param autotime: the integer for steps of MC updates
         :param rbmobj: the RBM objects for the scheme
-        :nosteps: the integer for number of steps of Gibbs updates in the rbm for one MC update
-        :binary: boolean, False for 1,-1 state updates while True for 1,0 updates, the latter is dangerous to use.
+        :param nosteps: the integer for number of steps of Gibbs updates in the rbm for one MC update
+        :param binary: boolean, False for 1,-1 state updates while True for 1,0 updates, the latter is dangerous to use.
         '''
         if binary == False:
             for _ in range(autotime):
@@ -308,7 +303,7 @@ class configuration():
     
     def simulate(self,beta=1,num=9,autotime=1, pretime=1,method='local_update'):   
         ''' 
-        This module simulates the Ising model with visulize plot on configurations,
+        Simulate the Ising model with visulize plot on configurations,
         but it is only helpful for 2D systems. There are at most nine figures of configuration evolutions.
         
         :param beta: real value for inverse temperature
@@ -378,14 +373,11 @@ class mag(observable):
 class mcmeasure(configuration):
     '''
     This class is designed for measurement in Monte Carlo, which stores the observable value in each MC step.
+    
+    :param hamiltonianobj: one instance from hamiltonian class as the guide Hamiltonian for MC
+    :param observableobjs: a list of instances from observable subclasses, eg. [mag()]
     '''
     def __init__(self,hamiltonianobj,observableobjs):
-        '''
-        Initialize the class with specified Hamiltonian and oberservables we want to measure.
-        
-        :param hamiltonianobj: one instance from hamiltonian class as the guide Hamiltonian for MC
-        :param observableobjs: a list of instances from observable subclasses, eg. [mag()]
-        '''
         super().__init__(hamiltonianobj)
         self.obs = observableobjs
         self.values = [[ob.inito(self.sites,self.config) for ob in self.obs]]
@@ -407,16 +399,13 @@ class mcmeasure(configuration):
 class writeconf2file(configuration):
     '''
     Class for MC updates and export configurations to .npy file.
+
+    :param hamiltonianobj: one instance from hamiltonian class as the guide Hamiltonian for MC
+    :param presteps: integer for MC steps we drop before record
+    :param sepsteps: integer for MC steps between two records
+    :param filename: string for the file path, note delete the file if it already exists
     '''
     def __init__(self,hamiltonianobj,presteps,sepsteps=1,filename='configuration.npy'):
-        '''
-        Initialize with some settings.
-        
-        :param hamiltonianobj: one instance from hamiltonian class as the guide Hamiltonian for MC
-        :param presteps: integer for MC steps we drop before record
-        :param sepsteps: integer for MC steps between two records
-        :param filename: string for the file path, note delete the file if it already exists
-        '''
         super().__init__(hamiltonianobj)
         self.presteps = presteps
         self.sepsteps = sepsteps
@@ -475,7 +464,7 @@ def analysis(series,n=1, message=True):
     :param n: a real value indicate we want to analyse the series as the power n of input series
     :param message: boolean value whose default value is true.
                     True for some information on the screeen indicating the return value,
-                    Flase for turning off the print.
+                    False for turning off the print.
     :returns: the list contains three real values, 
               for expectation, error bar and autocorrelation time respectively.
     '''
