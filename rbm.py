@@ -1,3 +1,7 @@
+'''
+The basic module for Restricted Boltzmann machine(RBM) and its generalizations.
+'''
+
 import numpy as np
 from scipy.special import expit
 
