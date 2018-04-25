@@ -1,7 +1,3 @@
-'''
-The basic module for Restricted Boltzmann machine(RBM) and its generalizations.
-'''
-
 import numpy as np
 from scipy.special import expit
 
@@ -13,7 +9,7 @@ def chunks(l, n):
     :param l: the list to be divided
     :param n: the integer for the number of elements in one batch
     :yields: list of batch size
-    
+
     Note the last batch may be smaller if 1%n != 0.
     '''
     np.random.shuffle(l)
@@ -39,7 +35,6 @@ def sampleinput(arrays):
     
     :param arrays: the input array whose elements are between 0 to 1 as probabilities
     :returns: the array with the same shape as the input with all elements whose values are 1 or 0
-    
     '''
     parrays = np.random.rand(*arrays.shape)
     return 0.5*np.sign(arrays-parrays)+0.5*np.ones(arrays.shape)
@@ -52,7 +47,7 @@ class RBM():
     :param visible: a list with the visble layer size, eg. [28,28] for MNIST data
     :param hidden: a list with the hidden layer size
 
-    Some trainning details are inspired by : https://www.cs.toronto.edu/~hinton/absps/guideTR.pdf
+    Some trainning details are inspired by : https://www.cs.toronto.edu/~hinton/absps/guideTR.pdf.
     '''
     
     def __init__(self, visible, hidden):
@@ -78,7 +73,7 @@ class RBM():
         '''
         Get weights of the model in the shape of visible and hidden layer.
         
-        :returns: weights array, eg. the shape is (28,28,10,5) for RBM([28,28],[10,5]) 
+        :returns: weights array, eg. the shape is (28,28,10,5) for RBM([28,28],[10,5]). 
         '''
         return self.weights.reshape(tuple(self.hidden+self.visible))
     
@@ -179,7 +174,7 @@ class RBM():
         :returns: list of two arrays, the first is configuration of visible layer 
                   and the second is for hidden layer
 
-        Note one step is v->h->v, so the hidden layer configurations is half step before visble ones
+        Note one step is v->h->v, so the hidden layer configurations is half step before visble ones.
         '''
         for i in range(nosteps):
             hiddendatas = self.sampleonvisible(visibledatas)
