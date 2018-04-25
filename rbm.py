@@ -1,13 +1,31 @@
+'''
+Basic modules for Restricted Boltzmann machine(RBM) and its generalizations.
+'''
+
 import numpy as np
 from scipy.special import expit
 
 
 def chunks(l, n):
+    '''
+    Generator for iteration which divides list l into n batches randomly.
+    
+    :param l: the list to be divided
+    :param n: the integer for the number of elements in one batch
+    :yields: list of batch size
+    Note the last batch may be smaller if 1%n != 0.
+    '''
     np.random.shuffle(l)
     for i in range(0, len(l), n):
         yield l[i:i+n]
         
 def reshapeinput(inputarray):
+    '''
+    Reshape the inputarray to 1D.
+    
+    :param inputarray: array with any shape
+    :returns: array with 1D shape
+    '''
     if len(inputarray.shape) == 1:
         return inputarray
     elif len(inputarray.shape) > 1:
@@ -15,13 +33,31 @@ def reshapeinput(inputarray):
 
 
 def sampleinput(arrays):
+    '''
+    Sample the arrays elementwise.
+    
+    :param arrays: the input array whose elements are between 0 to 1 as probabilities
+    :returns: the array with the same shape as the input with all elements whose values are 1 or 0
+    
+    '''
     parrays = np.random.rand(*arrays.shape)
     return 0.5*np.sign(arrays-parrays)+0.5*np.ones(arrays.shape)
 
 
 class RBM():
+    '''
+    RBM class
+    
+    Some trainning details are inspired by : https://www.cs.toronto.edu/~hinton/absps/guideTR.pdf
+    '''
     
     def __init__(self, visible, hidden):
+        '''
+        Initial the RBM instance with the structure of visible and hidden layers are given.
+        
+        :param visible: a list with the visble layer size, eg. [28,28] for MNIST data
+        :param hidden: a list with the hidden layer size
+        '''
         self.novisible = np.prod(visible)
         self.visible = visible
         self.nohidden = np.prod(hidden)
@@ -32,12 +68,26 @@ class RBM():
         self.string = ('RBM model: \nvisible layer size: %s \nhidden layer size:  %s'%(self.visible,self.hidden)) 
     
     def getbias(self):
+        '''
+        Get bias of the model in the shape of visible and hidden layer.
+        
+        :returns: list of two array, the first one is bias on visible layer while the second array 
+                  is bias on hidden layer
+        '''
         return np.array([self.biasonvisible.reshape(tuple(self.visible)),self.biasonhidden.reshape(tuple(self.hidden))])
     
     def getweights(self):
+        '''
+        Get weights of the model in the shape of visible and hidden layer.
+        
+        :returns: weights array, eg. the shape is (28,28,10,5) for RBM([28,28],[10,5]) 
+        '''
         return self.weights.reshape(tuple(self.hidden+self.visible))
     
     def summary(self):
+        '''
+        Print the basic information on this RBM.
+        '''
         print(self.string)
         
     def __repr__(self):
@@ -46,45 +96,109 @@ class RBM():
     __str__ = __repr__
     
     def probabilityonvisible(self,visibledatas):
+        '''
+        Get the conditional activation probability of hidden layer based on given configuration of visible layer.
+        
+        :visibledatas: array of visible configuration arrays (both in 1d or in the shape of visible layers are ok)
+        :returns: array of probability 1d arrays with the number of elements the same as hidden neurons 
+        '''
         biasb = np.array([self.biasonhidden for _ in range(len(visibledatas))])
         visibledatas = visibledatas.reshape(visibledatas.shape[0],self.novisible)
         return expit(visibledatas@self.weights.T+biasb)
     
     def probabilityonhidden(self,hiddendatas):
+        '''
+        Get the conditional activation probability of visible layer based on given configuration of hidden layer.
+        
+        :hiddendatas: array of hidden configuration arrays (both in 1d or in the shape of hidden layers are ok)
+        :returns: array of probability 1d arrays with the number of elements the same as visible neurons 
+        '''
         biasb = np.array([self.biasonvisible for _ in range(len(hiddendatas))])
         hiddendatas = hiddendatas.reshape(hiddendatas.shape[0],self.nohidden)
         return expit(hiddendatas@self.weights+biasb)
     
     def sampleonvisible(self,visibledatas):
+        '''
+        Get one sample configuration of hidden layer based on given configuration of visible layer.
+        
+        :visibledatas: array of visible configuration arrays (both in 1d or in the shape of visible layers are ok)
+        :returns: array of 1d configuration arrays with the number of elements the same as hidden neurons 
+        '''
         probability = self.probabilityonvisible(visibledatas)
         return sampleinput(probability)
 
     def sampleonhidden(self,hiddendatas):
+        '''
+        Get one sample configuration of visible layer based on given configuration of vhidden layer.
+        
+        :visibledatas: array of hidden configuration arrays (both in 1d or in the shape of hidden layers are ok)
+        :returns: array of 1d configuration arrays with the number of elements the same as visible neurons 
+        '''
         probability = self.probabilityonhidden(hiddendatas)
         return sampleinput(probability)
     
     def energy(self,visibledata,hiddendata):
+        '''
+        Calculate the energy of the model given configuration of both layers.
+        
+        :param visibledata: array of configuration of visible layer (both 1d and visible layer shape are ok)
+        :param hiddendata: array of configuration of hidden layer (both 1d and hidden layer shape are ok)
+        :returns: real value of the energy
+        '''
         visibledata, hiddendata = reshapeinput(visibledata), reshapeinput(hiddendata)
         return -(hiddendata@self.weights@visibledata+self.biasonvisible@visibledata+self.biasonhidden@hiddendata)
     
     def freeenergy(self, visibledata):
+        '''
+        Caculate the free energy of the model given visible data.
+        
+        :param visibledata: array of configuration of visible layer (both 1d and visible layer shape are ok)
+        :returns: real value of the free energy of the visible configuration
+        '''
         visibledata = reshapeinput(visibledata)
         return -np.dot(self.biasonvisible,visibledata) - np.sum(np.log(np.ones(self.nohidden)+np.exp(self.weights@visibledata+self.biasonhidden)))
         
     
     def randomvisible(self, no = 1, aim = 'D'):
+        '''
+        Provide random samples whose shape consistent with the model.
+        
+        :param no: integer for the number of samples one want to generate
+        :param aim: string, 'D' for configuration generation while 'P' for probability generation
+        :returns: array of arrays of configuration or probability with the shape of visible layer
+        '''
         if aim == 'D':
             return np.array([np.random.randint(2, size=tuple(self.visible)) for _ in range(no)])
         elif aim == 'P':
             return np.array([np.random.rand(*self.visible) for _ in range(no)])
         
     def Gibbsupdate(self, visibledatas, nosteps=1):
+        '''
+        Gibbs update for the model: start from visible layer
+        
+        :param visibledatas: array of configuration of visible layer (both 1d and visible layer shape are ok)
+        :param nosteps: integer for the Gibbs update steps
+        :returns: list of two arrays, the first is configuration of visible layer 
+                  and the second is for hidden layer
+        Note one step is v->h->v, so the hidden layer configurations is half step before visble ones
+        '''
         for i in range(nosteps):
             hiddendatas = self.sampleonvisible(visibledatas)
             visibledatas = self.sampleonhidden(hiddendatas)
         return [visibledatas,hiddendatas]
     
     def cdk(self, visibledatas, nosteps = 1):
+        '''
+        Modified Gibbs update used for CD-k training.
+        
+        :param visibledatas: array of configuration of visible layer (both 1d and visible layer shape are ok)
+        :param nosteps: integer for the Gibbs update steps or the k in CD-k
+        :returns: list of two arrays, the first is configuration of visible layer 
+                  and the second is for hidden layer
+        Note the difference between cdk update and Gibbs update. In the last step, the visible data are given 
+        by probability intead of states and then we use the probability to calculate probability of hidden 
+        layer as data for hidden layer which is half step later compared to visibledata.
+        '''
         if nosteps>1:
             hiddendatas = self.Gibbsupdate(visibledatas, nosteps-1)[1]
         elif nosteps == 1:
@@ -93,7 +207,21 @@ class RBM():
         hiddendatas = self.probabilityonvisible(visibledatas)
         return [visibledatas,hiddendatas]
     
-    def fit(self, visibledatas, testdatas, batch = 20, epoch = 50, learningrate = 0.05,regulation1 = 0, regulation2 = 0, cdkstep = 1, debuglog = True):
+    def fit(self, visibledatas, testdatas, batch = 20, epoch = 50, learningrate = 0.05,
+            regulation1 = 0, regulation2 = 0, cdkstep = 1, debuglog = True):
+        '''
+        Fit the RBM.
+        
+        :param visibledatas: the array of arrays of datas for training, eg. the shape [60000,28,28] for training
+        :param testdatas: the array of arrays of datas for training, eg. the shape [60000,20,20] for training
+        :param batch: integer for the size of batch for SGD
+        :param epoch: integer for the numbers of epochs of training
+        :param learningrate: real value for the update rate
+        :param regulation1: L1 regularization term
+        :param regulation2: L2 regularization term
+        :cdkstep: integer value of k in CD-k training
+        :debuglog: boolean, true for information print after each epoch
+        '''
         noepoch = 0
         notestdatas = len(testdatas)
         trainingdatas = visibledatas.copy()
@@ -140,15 +268,36 @@ class RBM():
                 print(np.sum(np.abs(self.weights)),np.sum(np.abs(learningrate*(positivew-negativew))))
 
     def mask(self, updateweights):
+        '''
+        Mask the updateweights in some pattern.
+        
+        :param updateweights: array in the shape of weights
+        :returns: array in the shape of weights after some processing
+        '''
         return updateweights
                 
     def error(self,visibledatas):
+        '''
+        Calculate the reconstruction error of specified visible data after one Gibbs update.
+        
+        :param visibledatas: array of configuration of visible layer (both 1d and visible layer shape are ok)
+        '''
         return np.sum(np.abs(self.Gibbsupdate(visibledatas,nosteps=1)[0]-visibledatas.reshape(visibledatas.shape[0],self.novisible)))/visibledatas.size
                 
                 
 class localRBM(RBM):
+    '''
+    RBM with locality, where only the weights within windows are nonzero for each hidden layer neuron.
+    '''
     
     def __init__(self, visible, window, stride):
+        '''
+        Initialize localRBM instance with the size of window and the size of stride (the same concepts in CNN).
+        
+        :param visible: a list with the visble layer size, eg. [28,28] for MNIST data
+        :param window: a list for the size of window, eg. [2,2]
+        :param stride: a list for the size of stride, eg. [2,2]
+        '''
         self.dimension = len(visible)
         for i in range(self.dimension):
             assert (visible[i]-window[i])%stride[i] == 0
@@ -160,6 +309,11 @@ class localRBM(RBM):
         self.weights = self.mask(self.weights)
     
     def getmask(self):
+        '''
+        Get the mask matrix with zero elements in required vanishing weights links.
+        
+        :returns: the array of the shape of weights with zero and one
+        '''
         maskm = np.zeros(tuple(self.hidden+self.visible))
         for hiddenpos in np.ndindex(*self.hidden):
             for windowpos in np.ndindex(*self.window):
