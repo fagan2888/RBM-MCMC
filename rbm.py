@@ -4,7 +4,7 @@ The basic module for Restricted Boltzmann machine(RBM) and its generalizations.
 
 import numpy as np
 from scipy.special import expit
-
+from multiprocessing import Pool
 
 def chunks(l, n):
     '''
@@ -212,7 +212,7 @@ class RBM():
         Fit the RBM.
         
         :param visibledatas: the array of arrays of datas for training, eg. the shape [60000,28,28] for training
-        :param testdatas: the array of arrays of datas for training, eg. the shape [60000,20,20] for training
+        :param testdatas: the array of arrays of datas for testing, eg. the shape [60000,20,20] for training
         :param batch: integer for the size of batch for SGD
         :param epoch: integer for the numbers of epochs of training
         :param learningrate: real value for the update rate
@@ -319,3 +319,237 @@ class localRBM(RBM):
         
     def mask(self, updateweights):
         return np.multiply(self.maskmatrix, updateweights)
+
+
+class FBM():
+    '''
+    Class designed as a special limit of general Boltzmann machine, where only visible layer exists.
+    
+    :param sites: a list giving the size information on the model
+    '''
+    def __init__(self, sites):
+        self.sites = sites
+        self.nosites = np.prod(sites)
+        self.bias = np.random.rand(self.nosites)-np.full((self.nosites), 0.5)
+        self.weights = np.random.rand(self.nosites,self.nosites)-np.full((self.nosites,self.nosites), 0.5)
+#         self.bias = -2.62*np.ones(100)
+#         self.weights = 1.81*np.ones((100,100))
+        self.states = [0]
+
+    def energy(self, state):
+        '''
+        Calculate the effective energy of the system.
+        
+        :param state: array of binary configurations of 1d shape or system shape
+        :returns: real value of energy of the model
+        '''
+        state = reshapeinput(state)
+        return -np.dot(self.bias, state)-state@self.weights@state/2
+    
+    def mcupdate(self, states, steps=1):
+        '''
+        Do Monte Carlo update on the model based on present weights.
+        
+        :param states: array of state arrays
+        :param steps: integer for steps of MC updates
+        :returns: array of state arrays after updates
+        
+        Note the input states should be changed after the function. Besides, this function is implemented
+        in non-parallel fashion and is deprecated: not used in self.fit() function.
+        '''
+        states = states.reshape(states.shape[0],self.nosites)
+        for state in states:
+
+            for _ in range(steps):
+                pos = np.random.randint(0, self.nosites)
+                delta = np.dot(self.weights[pos, :], state)+self.bias[pos]+self.weights[pos, pos]*(1-state[pos])
+                if state[pos] == 0:
+                    if delta > 0:
+                        state[pos] = 1
+                    elif np.random.rand() < np.exp(delta):
+                        state[pos] = 1
+                elif state[pos] == 1:
+                    if delta < 0:
+                        state[pos] = 0
+                    elif np.random.rand() < np.exp(-delta):
+                        state[pos] = 0
+        return states
+    
+    def updatecore(self, state, steps=1):
+        '''
+        Monte Carlo update scheme for specific state.
+        
+        :param state: array of one state of the system in 1D or system shape
+        :param steps: integer for steps of updates of the state
+        :return: array of the state after updates
+        '''
+        for _ in range(steps):
+            pos = np.random.randint(0, self.nosites)
+            delta = np.dot(self.weights[pos, :], state)+self.bias[pos]+self.weights[pos, pos]*(1-state[pos])
+            if state[pos] == 0:
+                if delta > 0:
+                    state[pos] = 1
+                elif np.random.rand() < np.exp(delta):
+                    state[pos] = 1
+            elif state[pos] == 1:
+                if delta < 0:
+                    state[pos] = 0
+                elif np.random.rand() < np.exp(-delta):
+                    state[pos] = 0
+        return state
+    
+    def paramcupdate(self, states, p, steps=1):
+        '''
+        Monte Carlo update of the given group of states implemented in parallel fashion.
+        
+        :param states: array of arrays of states (in 1d or model shape)
+        :param p: the Pool object from multiprocess module
+        :param steps: integer value for the steps of update
+        :returns: array of arrays of states after updates
+        '''
+        states = states.reshape(states.shape[0],self.nosites)
+        results = []
+        for state in states:
+            result = p.apply_async(self.updatecore, args=(state, steps))
+            results.append(result)
+            
+        for i in range(len(states)):
+            states[i] = results[i].get()
+
+#         for state in states:
+#             state = self.updatecore(state, steps=steps)
+#         non-parallel version code of the update scheme
+
+        return states
+    
+    def fit(self, traindatas, testdatas, batch=20, epoch=10, learningrate=0.01,
+            regulation1 = 0, regulation2 = 0, mcsteps=100, presteps=10000, debuglog=True):
+        '''
+        Train the model and optimize paramters with traindata given.
+
+        :param traindatas: the array of arrays of data for training
+        :param testdatas: the array of arrays of data for testing and evaluation
+        :param batch: integer for the size of batch for SGD
+        :param epoch: integer for the numbers of epochs of training
+        :param learningrate: real value for the update rate
+        :param regulation1: L1 regularization term
+        :param regulation2: L2 regularization term
+        :param mcsteps: integer value for steps of Monte Carlo update for each batch
+        :param presteps: integer value for steps of Monte Carlo before training
+        :param debuglog: boolean, true for information print after each epoch
+        '''
+        p = Pool()
+        
+        tdatas = traindatas.copy()
+        tdatas = tdatas.reshape(traindatas.shape[0], self.nosites)
+        assert len(tdatas)%batch == 0
+        if len(self.states) != batch:
+            self.states = np.array([np.random.randint(2, size=tuple(self.sites)) for _ in range(batch)])
+        self.states = self.paramcupdate(self.states, p, steps=presteps)
+        for noepoch in range(epoch):
+            databatch = chunks(tdatas, batch)
+
+            for statep in databatch:
+                
+                posih = np.mean(statep, axis=0)
+                posiw = statep.T@statep/batch
+                
+                self.states = self.paramcupdate(self.states, p, steps=mcsteps)
+                
+                
+                negah = np.mean(self.states, axis=0)
+                negaw = self.states.T@self.states/batch
+                
+                self.weights += self.mask((learningrate)*(posiw-negaw))
+                if regulation1 != 0:
+                    self.weights += self.mask(-(learningrate*regulation1)*np.sign(self.weights))
+                if regulation2 != 0:
+                    self.weights += self.mask(-(learningrate*regulation2)*self.weights)
+            
+                self.bias += self.maskh(learningrate*(posih-negah))
+
+
+                    
+            if debuglog is True:
+                print('-------------')
+                print('%s epoch finished'%(noepoch+1))
+                dfe = np.mean([self.energy(testdatas[i]) for i in range(len(testdatas))])
+                dft = np.mean([self.energy(traindatas[i]) for i in range(len(testdatas))])
+                dfo = np.mean([self.energy(np.random.randint(2, size=tuple(self.sites))) for i in range(len(testdatas))])
+                print('the free energy difference between training and evaluation set: %s'%(dft-dfe)) 
+                print('the free energy difference between training and standard set: %s'%(dft-dfo))
+                print('the magnitude of weights and the updates:')
+                print(np.sum(np.abs(self.weights)), np.sum(np.abs(learningrate*(posiw-negaw))))
+        
+        p.close()
+        p.join()
+        
+    def mask(self, updateweights):
+        '''
+        Mask the weight matrix.
+        
+        :param updateweights: array of weights shape
+        :returns: array of weights shape transformed from the input
+        '''
+        return updateweights
+    
+    def maskh(self, updatebias):
+        '''
+        Mask the bias vector.
+        
+        :param updatebias: 1d array of bias shape
+        :returns: 1d array of bias shape after transformation
+        '''
+        return updatebias
+    
+class localFBM(FBM):
+    '''
+    Spin model with masked couplings, only certain weights are allowed.
+    
+    :param feedmask: (optional) the mask matrix of weights shape
+    '''
+    def __init__(self, sites, feedmask=np.ones(1)):
+        super().__init__(sites)
+        if feedmask.shape[0] == 1:
+            self.maskmatrix = self.getmask()
+        else:
+            self.maskmatrix = feedmask
+        self.nonb = np.count_nonzero(self.maskmatrix)
+        self.weights = self.mask(self.weights)
+        
+    def getmask(self):
+        '''
+        Get the default mask matrix: NN Ising couplings.
+        
+        :returns: arrays of the weights matrix shape with only NN elements 1 and others zero
+        '''
+        maskm = np.zeros(tuple(self.sites+self.sites))
+        for spinpos in np.ndindex(*self.sites):
+            for nbspinpos in np.ndindex(*self.sites):
+                diff = np.abs(np.array(spinpos) - np.array(nbspinpos))
+                if np.count_nonzero(diff) == 1:
+                    axis = np.nonzero(diff)[0][0]
+                    if diff[axis] == 1 or diff[axis] == self.sites[axis]-1:
+                        maskm[spinpos+nbspinpos] = 1
+        return maskm.reshape(self.nosites, self.nosites)
+        
+    def mask(self, updateweights):
+        return np.multiply(self.maskmatrix, updateweights)
+    
+class uniformFBM(localFBM):
+    '''
+    Isotropic model with equal weights and bias within nonzero coupling windows.
+    '''
+    def __init__(self, sites):
+        super().__init__(sites)
+        self.bias = self.maskh(self.bias)
+        
+    
+    def mask(self, updateweights):
+        maskedweights = np.multiply(self.maskmatrix, updateweights)
+        updatevalue = np.sum(maskedweights)/(self.nonb)
+        return updatevalue*self.maskmatrix
+    
+    def maskh(self, updatebias):
+        updatevalue = np.mean(updatebias)
+        return updatevalue*np.ones(self.nosites)
