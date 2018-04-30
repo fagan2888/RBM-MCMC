@@ -134,8 +134,6 @@ class Ising(hamiltonian):
                 nlist.append(le)
                 ri[i] = (position[i]+nnearest)%self.sizelist[i]
                 nlist.append(ri)
-        elif nnearest > 1:
-            nlist = self.customized_neighbor(position, nnearest)
         return np.array(nlist)
 
     def energy2d(self, spin):
@@ -144,6 +142,8 @@ class Ising(hamiltonian):
 
         :param spin: the array with the system size shape whose elements give spin states
         :returns: the real value of the total energy in the system
+        
+        Note this function only works in 2D, though the model class in general works in any dimension.
         '''
         te = 0
         for i in range(spin.shape[0]-1):
@@ -158,6 +158,31 @@ class Ising(hamiltonian):
         return te
 
 
+class IsingNNN(Ising):
+    '''
+    Ising model with NNN couplings in 2D square lattice(only).
+    '''
+    def __init__(self, sizelist, maxsep=2, coupling=[0,0,-1,-1]):
+        super().__init__(sizelist, maxsep, coupling)
+    
+    def neighbor(self, position, nnearest=1):
+        if nnearest <= 1:
+            return super().neighbor(position, nnearest)
+        elif nnearest == 2:
+            results = []
+            position = np.array(position)
+            nnvector = [np.array([1,1]),np.array([1,-1]),np.array([-1,1]),np.array([-1,-1])]
+            for vector in nnvector:
+                results.append((position+vector)%self.sizelist)
+            return np.array(results)
+                    
+    def energy2d(self, spin):
+        '''
+        Not implement yet, use totalenergy() instead.
+        '''
+        pass
+    
+    
 class configuration():
     '''
     The class who store the configuration of the system and carryies out Monte Carlo updates.
@@ -227,7 +252,7 @@ class configuration():
                 updated = 0
                 position = self.randompos()
                 s = self.config[tuple(position)]
-                cost = -2*self.system.neighborenergy(position, self.config) # this is dangerous now, not suitable for soun square term of energy
+                cost = -2*self.system.neighborenergy(position, self.config) 
                 if self.system.coupling[1] != 0:
                     cost += 2*self.system.coupling[1]
                 if cost < 0:
@@ -365,7 +390,7 @@ class observable():
 
 class mag(observable):
     '''
-    Subclass from observable for magnetic moment in th system.
+    Subclass from observable for magnetic moment in the system.
     '''
     def inito(self, sites, config):
         return 1/sites*np.sum(config)
@@ -374,6 +399,22 @@ class mag(observable):
         delta = 0
         for position in positions:
             delta = delta + 2* config[tuple(position)]/sites
+        return delta
+    
+class sdw(observable):
+    '''
+    Subclass from observable for spin density wave (AF order) in the system.
+    '''
+    def __init__(self, sizelist):
+        self.afm = np.array(list(map(lambda x: (-1)**np.sum(x), [i for i in np.ndindex(tuple(sizelist))]))).reshape(tuple(sizelist))
+        
+    def inito(self, sites, config):
+        return 1/sites*np.sum(np.multiply(self.afm, config))
+
+    def updato(self, positions, sites, config):
+        delta = 0
+        for position in positions:
+            delta = delta + 2*self.afm[tuple(position)]*config[tuple(position)]/sites
         return delta
 
 class mcmeasure(configuration):
