@@ -553,3 +553,45 @@ class uniformFBM(localFBM):
     def maskh(self, updatebias):
         updatevalue = np.mean(updatebias)
         return updatevalue*np.ones(self.nosites)
+
+class NNNFBM(uniformFBM):
+    '''
+    Isotropic model with NN and NNN couplings as well as external field.
+    '''
+    def __init__(self, sites):
+        FBM.__init__(self, sites)
+        self.NNmaskmatrix = self.getNNmask()
+        self.NNNmaskmatrix = self.getNNNmask()
+        self.maskmatrix = self.NNmaskmatrix+self.NNNmaskmatrix
+        self.nonn = np.count_nonzero(self.NNmaskmatrix)
+        self.nonnn = np.count_nonzero(self.NNNmaskmatrix)
+        self.weights = self.mask(self.weights)
+        self.bias = self.maskh(self.bias)
+        
+    def getNNmask(self):
+        '''
+        Get the mask matrix for the NN coupling part.
+        '''
+        return super().getmask()
+    
+    def getNNNmask(self):
+        '''
+        Get the mask matrix for the NNN coupling part.
+        '''
+        maskm = np.zeros(tuple(self.sites+self.sites))
+        for spinpos in np.ndindex(*self.sites):
+            for nbspinpos in np.ndindex(*self.sites):
+                diff = np.abs(np.array(spinpos) - np.array(nbspinpos))
+                if np.count_nonzero(diff) == 2:
+                    axis = np.nonzero(diff)[0]  #[0],[1]
+                    if (diff[axis[0]] == 1 or diff[axis[0]] == self.sites[axis[0]]-1)\
+                    and (diff[axis[1]] == 1 or diff[axis[1]] == self.sites[axis[1]]-1) :
+                        maskm[spinpos+nbspinpos] = 1
+        return maskm.reshape(self.nosites, self.nosites)
+    
+    def mask(self, updateweights):
+        NNweights = np.multiply(self.NNmaskmatrix, updateweights)
+        NNupdatevalue = np.sum(NNweights)/(self.nonn)
+        NNNweights = np.multiply(self.NNNmaskmatrix, updateweights)
+        NNNupdatevalue = np.sum(NNNweights)/(self.nonnn)
+        return NNupdatevalue*self.NNmaskmatrix+NNNupdatevalue*self.NNNmaskmatrix
